@@ -17,11 +17,11 @@ import RNPickerSelect from 'react-native-picker-select';
 
 
 const Home = () => {
-  const [siteOptions, setSiteOptions] = useState([]);
+  const [siteOptionsV2, setSiteOptions] = useState([]);
   const [selectedSite, setSelectedSite] = useState();
   const [imageUrl, setImageUrl] = useState();
-  const [coordsDict, setCoordsDict] = useState({});
-  const [contactDetails, setContactDetails] = useState({});
+  const [coordsDictV2, setCoordsDict] = useState({});
+  const [contactDetailsV3, setContactDetails] = useState({});
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [observedData, setObservedData] = useState([]);
@@ -309,18 +309,24 @@ const Home = () => {
     const checkAndFetchData = async (url, storageKey, setDataFunction, postProcess) => {
       const lastFetchDate = await AsyncStorage.getItem(`lastFetchDate-${storageKey}`);
       const today = new Date().toISOString().split('T')[0];
-
+    
       let data;
       if (lastFetchDate !== today) {
         try {
           const response = await fetch(url);
           const text = await response.text();
-          data = JSON.parse(text);
+    
+          // ✅ Handle plain text file (stations.txt from your Python script)
+          if (url.includes('stations_3.txt')) {
+            data = text.trim().split('\n').map(line => line.trim());
+          } else {
+            data = JSON.parse(text); // JSON files like beach_lat_lon.txt or contact_details.json
+          }
+    
           await AsyncStorage.setItem(storageKey, JSON.stringify(data));
           await AsyncStorage.setItem(`lastFetchDate-${storageKey}`, today);
         } catch (error) {
           console.error(`Error fetching data from ${url}:`, error);
-          // Attempt to load from AsyncStorage if fetch fails
           const storedData = await AsyncStorage.getItem(storageKey);
           if (storedData) {
             data = JSON.parse(storedData);
@@ -332,8 +338,7 @@ const Home = () => {
           data = JSON.parse(storedData);
         }
       }
-
-      // Apply post-process (if available) and update the state
+    
       if (data) {
         if (postProcess) {
           data = postProcess(data);
@@ -341,29 +346,33 @@ const Home = () => {
         setDataFunction(data);
       }
     };
-
-    // Function to select the first site as default
+    
     const processSiteOptions = (siteArray) => {
       if (Array.isArray(siteArray) && siteArray.length > 0) {
-        // Extract the site ID from the first item in the array and set it as the selected site
+        console.log(`✅ Loaded ${siteArray.length} site options.`);
+        console.dir(siteArray);
+    
         const firstSiteId = siteArray[0].match(/\(([^)]+)\)/)?.[1];
         setSelectedSite(firstSiteId);
         return siteArray;
       } else {
-        console.error('Fetched data is not an array or is empty:', siteArray);
+        console.error('❌ Fetched site data is empty or invalid:', siteArray);
         return [];
       }
     };
+    
+    
+    
 
-    checkAndFetchData('https://enterococcus.today/waf/TX/others/stations.txt', 'siteOptions', setSiteOptions, processSiteOptions);
-    checkAndFetchData('https://enterococcus.today/waf/TX/others/beach_lat_lon.txt', 'coordsDict', setCoordsDict);
-    checkAndFetchData('https://enterococcus.today/waf/TX/others/contact_details.json', 'contactDetails', setContactDetails);
+    checkAndFetchData('https://enterococcus.today/waf/TX/others/stations_3.txt', 'siteOptionsV2', setSiteOptions, processSiteOptions);
+    checkAndFetchData('https://enterococcus.today/waf/TX/others/beach_lat_lon.txt', 'coordsDictV2', setCoordsDict);
+    checkAndFetchData('https://enterococcus.today/waf/TX/others/contact_details_2.json', 'contactDetailsV3', setContactDetails);
 
   }, []);
 
   useEffect(() => {
     if (selectedSite) {
-      const imageSrc = `https://enterococcus.today/waf/TX/others/beach_images/${selectedSite}.jpg`;
+      const imageSrc = `https://enterococcus.today/waf/TX/others/beach_images_2/${selectedSite}.jpg`;
       setImageUrl(imageSrc);
     }
   }, [selectedSite]);
@@ -414,7 +423,7 @@ const Home = () => {
         >
           <SafeAreaView style={styles.dropdownContainer} onStartShouldSetResponder={() => true}>
             <FlatList
-              data={siteOptions}
+              data={siteOptionsV2}
               renderItem={renderPickerItem}
               keyExtractor={(item, index) => index.toString()}
               style={styles.dropdownList}
@@ -437,7 +446,7 @@ const Home = () => {
           >
             <SafeAreaView style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', }}>
               <Text style={{ color: 'blue', padding: 5 }}>
-                {selectedSite ? siteOptions.find(item => item.match(/\(([^)]+)\)/)?.[1] === selectedSite) : 'Select Site'}
+                {selectedSite ? siteOptionsV2.find(item => item.match(/\(([^)]+)\)/)?.[1] === selectedSite) : 'Select Site'}
               </Text>
             </SafeAreaView>
           </TouchableOpacity>
@@ -465,15 +474,15 @@ const Home = () => {
 
       <Text style={{ marginTop: 30, fontSize: 14, fontWeight: 'bold' }}>Location</Text>
       <SafeAreaView style={styles.container_location}>
-        {selectedSite && coordsDict[selectedSite] && (
+        {selectedSite && coordsDictV2[selectedSite] && (
           <SafeAreaView style={{ flexDirection: 'row', alignItems: 'center', paddingBottom: 10 }}>
             <Text style={{ fontSize: 12 }}>
               <Text style={{ fontWeight: 'bold' }}>Latitude: </Text>
-              <Text>{coordsDict[selectedSite].lat}</Text>
+              <Text>{coordsDictV2[selectedSite].lat}</Text>
             </Text>
             <Text style={{ fontSize: 12, paddingLeft: 50 }}>
               <Text style={{ fontWeight: 'bold' }}>Longitude: </Text>
-              <Text>{coordsDict[selectedSite].long}</Text>
+              <Text>{coordsDictV2[selectedSite].long}</Text>
             </Text>
           </SafeAreaView>
         )}
@@ -486,7 +495,7 @@ const Home = () => {
       <Text style={{ marginTop: 30, fontSize: 14, fontWeight: 'bold' }}>Contact</Text>
       <SafeAreaView>
         <ScrollView contentContainerStyle={styles.container_contact}>
-          {selectedSite && <ContactDetailsView details={contactDetails[selectedSite]} />}
+          {selectedSite && <ContactDetailsView details={contactDetailsV3[selectedSite]} />}
         </ScrollView>
       </SafeAreaView>
 
