@@ -6,6 +6,13 @@ import { styles } from '../style/style_graph_view';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomZoomBackgroundContainer from './CustomZoomBackgroundContainer';
 import { Svg, Line, Path, G, Text as SvgText, Rect, Circle } from 'react-native-svg';
+import { PinchGestureHandler } from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedGestureHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 const chartPadding = { top: 10, bottom: 50, left: 50, right: 50 };
 const configIcon = require('../../assets/images/map_images/configuration_icon.jpg');
@@ -39,6 +46,21 @@ const GraphView = ({ siteId }) => {
   const toggleDropdown = () => {
     setDropdownVisible(!dropdownVisible);
   };
+
+  const scale = useSharedValue(1);
+
+  const pinchHandler = useAnimatedGestureHandler({
+    onActive: (event) => {
+      scale.value = event.scale;
+    },
+    onEnd: () => {
+      scale.value = withTiming(1);
+    }
+  });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }]
+  }));
 
   const handlePlotToggle = (key, group = false) => {
     if (group) {
@@ -86,7 +108,6 @@ const GraphView = ({ siteId }) => {
     if (siteId) {
       try {
         const response = await axios.get(`https://enterococcus.today/waf/TX/others/eCount_stat_app/${siteId}.csv?ts=${new Date().getTime()}`);
-        console.log(response)
 
         // Parse the CSV data
         const parseDate = d3.timeParse("%Y-%m-%d");
@@ -103,19 +124,25 @@ const GraphView = ({ siteId }) => {
           return newRow;
         });
 
+        // Include all dates, even if they have only empty values
+        const allDates = parsedData.map(d => d.date).filter(Boolean);
+
+        // Still filter for actual values to plot
         const filteredData = parsedData.filter(d =>
           d.date &&
           Object.keys(d)
             .filter(k => k !== 'date')
-            .some(k => !isNaN(d[k])) // ✅ at least one usable value in the row
+            .some(k => !isNaN(d[k]))
         );
-        console.log('Parsed rows:', parsedData.length, '→ Filtered:', filteredData.length);
 
-        const minDate = d3.min(filteredData, d => d.date);
-        let maxDate = d3.max(filteredData, d => d.date);
-        maxDate = new Date(maxDate.getTime() + 2 * 24 * 60 * 60 * 1000); // add 2 days padding
+        const minDate = d3.min(allDates);
+        let maxDate = d3.max(allDates);
+
+        // Extend maxDate by 2 days to show empty space at the end
+        maxDate = new Date(maxDate.getTime() + 0 * 24 * 60 * 60 * 1000);
         setStartDate(minDate);
         setEndDate(maxDate);
+
 
         const transformedData = filteredData.reduce((acc, row) => {
           Object.keys(row).forEach(key => {
@@ -182,9 +209,9 @@ const GraphView = ({ siteId }) => {
   let tickValues = [];
   if (Object.keys(data).length > 0) {
     // Calculate the maximum date across all sites
-    const allDates = Object.values(data).flatMap(dataset => dataset.map(d => new Date(d.date)));
-    const minDate = d3.min(allDates);
-    const maxDate = d3.max(allDates);
+    const minDate = startDate;
+    const maxDate = endDate;
+    
   
     // Calculate tick values for each week from the current minimum date until the end of the next month of the maximum date
     tickValues = [new Date(minDate)];
@@ -194,7 +221,7 @@ const GraphView = ({ siteId }) => {
   
     // Add extra tick values with a gap of one week until the end of the next month
     while (tickValues[tickValues.length - 1] <= lastDayOfMonth) {
-      tickValues.push(new Date(tickValues[tickValues.length - 1].getTime() + 7 * 24 * 60 * 60 * 1000));
+      tickValues.push(new Date(tickValues[tickValues.length - 1].getTime() + 0 * 24 * 60 * 60 * 1000));
     }
   }
   
@@ -321,36 +348,34 @@ const colors = [
       </View>
   
       {Object.keys(data).length > 0 && (
-        <CustomZoomBackgroundContainer
-          width={400}
-          height={500}
-          yScale={yScale} // ✅ Add this!
-          onZoom={handleSvgZoom}
-        >
+        <PinchGestureHandler onGestureEvent={pinchHandler}>
+          <Animated.View style={[{ width: screenWidth, height: screenHeight }, animatedStyle]}>
+            <Svg width={screenWidth} height={screenHeight}>
 
 
         <Svg style={{ position: 'absolute', top: 0, left: 0 }}>
-          <Rect
-            x={chartPadding.left}
+        <Rect
+            x={xScale(startDate)}
             y={yScale(104)}
-            width={screenWidth - chartPadding.left - chartPadding.right}
+            width={xScale(endDate) - xScale(startDate)}
             height={yScale(35) - yScale(104)}
-            fill="#FFFFE5" // yellow zone
+            fill="#FFFFE5"
           />
           <Rect
-            x={chartPadding.left}
+            x={xScale(startDate)}
             y={yScale(35)}
-            width={screenWidth - chartPadding.left - chartPadding.right}
+            width={xScale(endDate) - xScale(startDate)}
             height={yScale(0) - yScale(35)}
-            fill="#E5FFE5" // green zone
+            fill="#E5FFE5"
           />
           <Rect
-            x={chartPadding.left}
-            y={yScale(300)} // high limit (adjust as needed)
-            width={screenWidth - chartPadding.left - chartPadding.right}
+            x={xScale(startDate)}
+            y={yScale(300)}
+            width={xScale(endDate) - xScale(startDate)}
             height={yScale(104) - yScale(300)}
-            fill="#FFE5E5" // red zone
+            fill="#FFE5E5"
           />
+
         </Svg>
         <Svg
           width={screenWidth}
@@ -582,8 +607,11 @@ const colors = [
           
 
         </Svg>
-        </CustomZoomBackgroundContainer>
+        </Svg>
+        </Animated.View>
+      </PinchGestureHandler>      
       )}
+
     </ScrollView>
 
       {tooltipData && (
