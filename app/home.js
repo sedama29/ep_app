@@ -14,6 +14,7 @@ import MapImage4 from '../assets/images/map_images/NUE.jpg';
 import MapImage5 from '../assets/images/map_images/CAM.jpg';
 const initialLayout = { width: Dimensions.get('window').width };
 import RNPickerSelect from 'react-native-picker-select';
+import { Alert } from 'react-native'; // Import the Alert component
 
 
 const Home = () => {
@@ -31,6 +32,7 @@ const Home = () => {
   const [isCamModalVisible, setCamModalVisible] = useState(false);
   const [isPickerModalVisible, setPickerModalVisible] = useState(false);
   const [buttonLayout, setButtonLayout] = useState(null);
+  const [delayedData, setDelayedData] = useState([]);
 
 
   const renderPickerItem = ({ item }) => (
@@ -183,55 +185,76 @@ const Home = () => {
     }
   };
 
+  
+
   const fetchData = async () => {
     try {
       const observed = await fetchCSVData('https://enterococcus.today/waf/TX/others/observed.csv');
       const predicted = await fetchCSVData('https://enterococcus.today/waf/TX/others/predicted.csv');
-
+      const delayed = await fetchCSVData('https://enterococcus.today/waf/TX/others/delayed_data.csv');
+  
       setObservedData(observed);
       setPredictedData(predicted);
+      setDelayedData(delayed);
+  
       setTotalCount(observed.length + predicted.length);
-
-
+  
       AsyncStorage.setItem('observedData', JSON.stringify(observed));
       AsyncStorage.setItem('predictedData', JSON.stringify(predicted));
+      AsyncStorage.setItem('delayedData', JSON.stringify(delayed));
+  
       const today = new Date().toISOString().split('T')[0];
       AsyncStorage.setItem('lastFetchDate', today);
     } catch (error) {
       const storedObserved = await AsyncStorage.getItem('observedData');
       const storedPredicted = await AsyncStorage.getItem('predictedData');
+      const storedDelayed = await AsyncStorage.getItem('delayedData');
+  
       if (storedObserved) setObservedData(JSON.parse(storedObserved));
       if (storedPredicted) setPredictedData(JSON.parse(storedPredicted));
+      if (storedDelayed) setDelayedData(JSON.parse(storedDelayed));
+    }
+  };
+  
+
+useEffect(() => {
+  const checkAndFetchData = async () => {
+    const lastFetchDate = await AsyncStorage.getItem('lastFetchDate');
+    const today = new Date().toISOString().split('T')[0];
+
+    if (lastFetchDate !== today) {
+      await fetchData();
+    } else {
+      const storedObserved = await AsyncStorage.getItem('observedData');
+      const storedPredicted = await AsyncStorage.getItem('predictedData');
+      const storedDelayed = await AsyncStorage.getItem('delayedData');
+
+      let observedData = [];
+      let predictedData = [];
+      let delayedData = [];
+
+      if (storedObserved) {
+        observedData = JSON.parse(storedObserved);
+        setObservedData(observedData);
+      }
+
+      if (storedPredicted) {
+        predictedData = JSON.parse(storedPredicted);
+        setPredictedData(predictedData);
+      }
+
+      if (storedDelayed) {
+        delayedData = JSON.parse(storedDelayed);
+        setDelayedData(delayedData);
+      }
+
+      setTotalCount(observedData.length + predictedData.length);
     }
   };
 
-  useEffect(() => {
-    const checkAndFetchData = async () => {
-      const lastFetchDate = await AsyncStorage.getItem('lastFetchDate');
-      const today = new Date().toISOString().split('T')[0];
+  checkAndFetchData();
+}, []);
 
-      if (lastFetchDate !== today) {
-        await fetchData();
-      } else {
-        const storedObserved = await AsyncStorage.getItem('observedData');
-        const storedPredicted = await AsyncStorage.getItem('predictedData');
-        let observedData = [];
-        let predictedData = [];
-
-        if (storedObserved) {
-          observedData = JSON.parse(storedObserved);
-          setObservedData(observedData);
-        }
-        if (storedPredicted) {
-          predictedData = JSON.parse(storedPredicted);
-          setPredictedData(predictedData);
-        }
-        setTotalCount(observedData.length + predictedData.length);
-      }
-    };
-
-    checkAndFetchData();
-  }, []);
 
   const ObservedTab = () => (
     <ScrollView>
@@ -264,13 +287,26 @@ const Home = () => {
     </ScrollView>
   );
 
+  const DelayedTab = () => (
+    <ScrollView>
+      {delayedData.map((item, idx) => (
+        <Text key={idx} style={styles.bulletText}>
+          • <Text style={styles.boldText}>{item.site_name} ({item.site_id}) :</Text>
+          {' '}The last observed data is on {item.last_date}.
+        </Text>
+      ))}
+    </ScrollView>
+  );
+  
+
   useEffect(() => {
     setRoutes([
       { key: 'observed', title: `Observed (${observedData.length})` },
       { key: 'predicted', title: `Predicted (${predictedData.length})` },
+      { key: 'delayed', title: `Delayed Deliveries (${delayedData.length})` },
     ]);
-  }, [observedData, predictedData]);
-
+  }, [observedData, predictedData, delayedData]);
+  
   const showDataAlert = () => {
     setIsModalVisible(true);
   };
@@ -278,33 +314,13 @@ const Home = () => {
   const renderScene = SceneMap({
     observed: ObservedTab,
     predicted: PredictedTab,
+    delayed: DelayedTab,
   });
+  
 
 
   useEffect(() => {
-    const fetchData = async (url, storageKey, setDataFunction, postProcess = null) => {
-      try {
-        const response = await fetch(url);
-        const text = await response.text();
-        let data = JSON.parse(text);
 
-        // Post-process data if needed (e.g., setting default site)
-        if (postProcess) {
-          data = postProcess(data);
-        }
-
-        setDataFunction(data);
-        AsyncStorage.setItem(storageKey, JSON.stringify(data));
-        const today = new Date().toISOString().split('T')[0];
-        AsyncStorage.setItem(`lastFetchDate-${storageKey}`, today);
-      } catch (error) {
-        console.error(`Error fetching data from ${url}:`, error);
-        const storedData = await AsyncStorage.getItem(storageKey);
-        if (storedData) {
-          setDataFunction(JSON.parse(storedData));
-        }
-      }
-    };
 
     const checkAndFetchData = async (url, storageKey, setDataFunction, postProcess) => {
       const lastFetchDate = await AsyncStorage.getItem(`lastFetchDate-${storageKey}`);
@@ -313,20 +329,22 @@ const Home = () => {
       let data;
       if (lastFetchDate !== today) {
         try {
-          const response = await fetch(url);
-          const text = await response.text();
+          const response = await axios.get(url);
+          let content = response.data;
     
-          // ✅ Handle plain text file (stations.txt from your Python script)
-          if (url.includes('stations_3.txt')) {
-            data = text.trim().split('\n').map(line => line.trim());
+          // Handle plain text file (e.g. stations.txt)
+          if (storageKey === 'siteOptionsV2') {
+            data = content.trim().split('\n').map(line => line.trim());
           } else {
-            data = JSON.parse(text); // JSON files like beach_lat_lon.txt or contact_details.json
+            data = content;
           }
     
           await AsyncStorage.setItem(storageKey, JSON.stringify(data));
           await AsyncStorage.setItem(`lastFetchDate-${storageKey}`, today);
         } catch (error) {
-          console.error(`Error fetching data from ${url}:`, error);
+          console.error(`❌ Axios failed for ${storageKey}:`, error.message);
+          // Show an alert with the error message
+          
           const storedData = await AsyncStorage.getItem(storageKey);
           if (storedData) {
             data = JSON.parse(storedData);
@@ -349,14 +367,13 @@ const Home = () => {
     
     const processSiteOptions = (siteArray) => {
       if (Array.isArray(siteArray) && siteArray.length > 0) {
-        console.log(`✅ Loaded ${siteArray.length} site options.`);
-        console.dir(siteArray);
-    
         const firstSiteId = siteArray[0].match(/\(([^)]+)\)/)?.[1];
         setSelectedSite(firstSiteId);
         return siteArray;
       } else {
         console.error('❌ Fetched site data is empty or invalid:', siteArray);
+        // Show an alert when data is invalid or empty
+        // Alert.alert('Error Processing Site Data', 'The site data is empty or invalid.');
         return [];
       }
     };
@@ -407,31 +424,34 @@ const Home = () => {
       </Modal>
 
 
-      <Modal
-        visible={isPickerModalVisible}
-        onRequestClose={() => setPickerModalVisible(false)}
-        transparent={true}
-        animationType="fade"
-      >
-      <SafeAreaView style={[styles.modalContainer, {
-          top: buttonLayout ? buttonLayout.y + buttonLayout.height : 0, // Position below the button
-        }]}>
-        <TouchableOpacity
-          style={styles.modalContainer}
-          activeOpacity={1} // Maintain the background opacity
-          onPressOut={() => setPickerModalVisible(false)} // Dismiss modal on pressing outside
+      {buttonLayout && (
+        <Modal
+          visible={isPickerModalVisible}
+          onRequestClose={() => setPickerModalVisible(false)}
+          transparent={true}
+          animationType="fade"
         >
-          <SafeAreaView style={styles.dropdownContainer} onStartShouldSetResponder={() => true}>
-            <FlatList
-              data={siteOptionsV2}
-              renderItem={renderPickerItem}
-              keyExtractor={(item, index) => index.toString()}
-              style={styles.dropdownList}
-            />
+          <SafeAreaView style={[styles.modalContainer, {
+            top: buttonLayout.y + buttonLayout.height,
+          }]}>
+            <TouchableOpacity
+              style={styles.modalContainer}
+              activeOpacity={1}
+              onPressOut={() => setPickerModalVisible(false)}
+            >
+              <SafeAreaView style={styles.dropdownContainer} onStartShouldSetResponder={() => true}>
+                <FlatList
+                  data={siteOptionsV2}
+                  renderItem={renderPickerItem}
+                  keyExtractor={(item, index) => index.toString()}
+                  style={styles.dropdownList}
+                />
+              </SafeAreaView>
+            </TouchableOpacity>
           </SafeAreaView>
-        </TouchableOpacity>
-        </SafeAreaView>
-      </Modal>
+        </Modal>
+      )}
+
 
 
       <SafeAreaView style={styles.pickerAndDotsContainer}>

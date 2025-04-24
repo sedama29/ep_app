@@ -36,7 +36,7 @@ export const styles = StyleSheet.create({
       },
       android: {
         maxHeight: '80%',
-        width: '70%',
+        width: '68%',
         alignSelf: 'left',
       },
     }),
@@ -53,6 +53,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderColor: 'lightgray', 
+    width: '100%',
   },
   pickerText: {
     fontSize: 14,
@@ -169,7 +170,7 @@ export const styles = StyleSheet.create({
   },
   alertText: {
     color: 'red',
-    fontSize: 16,
+    fontSize: 14,
     // fontFamily: 'Helvetica',
   },
   boldText: {

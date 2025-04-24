@@ -15,10 +15,12 @@ export const SignInWithGoogle = async () => {
 
     const result = await GoogleSignin.signIn();
 
+      // Log everything for debugging
+
     // Check if the result is valid
-    if (!result || !result.data || !result.data.user || !result.data.idToken) {
-      throw new Error('Google Sign-In failed or incomplete data returned.');
-    }
+    // if (!result || !result.data.user || !result.data.idToken) {
+    //   Alert.alert('Google Sign-In failed or incomplete data returned.');
+    // }
 
     const { idToken, user } = result.data;
     const email = user.email.toLowerCase(); // Normalize to lowercase
