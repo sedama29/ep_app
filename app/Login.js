@@ -2,6 +2,12 @@ import { Alert } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import auth from '@react-native-firebase/auth';
 import database from '@react-native-firebase/database';
+import firebase from '@react-native-firebase/app';  // <-- 🔥 Add this line
+
+// ✅ Initialize firebase app if not already initialized
+if (!firebase.apps.length) {
+  firebase.initializeApp();
+}
 
 GoogleSignin.configure({
   webClientId: '452177743942-2b8kcolj2g278hci3nfjlq5f90jpgaga.apps.googleusercontent.com',
