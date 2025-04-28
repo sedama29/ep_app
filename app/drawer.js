@@ -1,5 +1,6 @@
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
+import { Platform, View } from 'react-native';
 import Home from './home';
 import About from './legend/About';
 import Tglo from './legend/Tglo';
@@ -12,7 +13,9 @@ const DrawerNavigator = () => {
     <Drawer.Navigator
       screenOptions={({ route }) => ({
         header: ({ scene }) => (
-          <CustomHeader title={route.name} showHeader={scene?.route?.name !== 'Home'} />
+          <View style={{ paddingTop: Platform.OS === 'ios' ? 20 : 0 }}>
+            <CustomHeader title={route.name} showHeader={scene?.route?.name !== 'Home'} />
+          </View>
         ),
       })}
     >

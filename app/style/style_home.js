@@ -33,6 +33,7 @@ export const styles = StyleSheet.create({
         maxHeight: '80%',
         width: '68%',
         alignSelf: 'left',
+        marginTop: '25%'
       },
       android: {
         maxHeight: '80%',
@@ -48,6 +49,18 @@ export const styles = StyleSheet.create({
     fontSize: 14, // Font size of the selected value
     paddingHorizontal: 10, // Add horizontal padding to the selected value
   },
+  pickerButton: {
+    height: 40, // Make the button taller
+    // width: '100%', // Wider button (you can adjust if needed)
+    // backgroundColor: '#ffffff', // Light background so it's visible
+    // // borderRadius: 8, // Rounded corners
+    justifyContent: 'center',
+    // // alignItems: 'center',
+    // alignSelf: 'center', // Center it horizontally
+    // // marginVertical: 10, // Space above and below
+    // // paddingHorizontal: 10, // Space inside button
+  },
+  
   pickerItem: {
     paddingVertical: 8, 
     paddingHorizontal: 12,
